@@ -163,7 +163,9 @@ public class AdaptiveSidebarViewController : UIViewController {
     
     private func hideViewController(_ viewController: UIViewController, animated: Bool) {
         if let navigationController = navigationController {
-            navigationController.popViewController(animated: animated)
+            if (navigationController.topViewController === sideViewController) {
+                navigationController.popViewController(animated: animated)
+            }
         } else {
             viewController.dismiss(animated: animated, completion: nil)
         }
