@@ -49,6 +49,8 @@ public class AdaptiveSidebarViewController : UIViewController {
       }
     }
     
+    public var resizeMainViewWhenSideViewVisible: Bool = false
+    
     //MARK: Private
     
     private var mainViewContainer: UIView!
@@ -56,6 +58,7 @@ public class AdaptiveSidebarViewController : UIViewController {
     
     private var sideViewWidthConstraint : NSLayoutConstraint!
     private var sideViewRightConstraint : NSLayoutConstraint!
+    private var mainRightConstraint : NSLayoutConstraint!
     
     private var toggleAnimationInProgress = false
     
@@ -63,6 +66,9 @@ public class AdaptiveSidebarViewController : UIViewController {
         if isSideViewControllerShownInSideViewContainer() {
             if toggleAnimationInProgress == false {
                 sideViewRightConstraint.constant = constant
+                if (resizeMainViewWhenSideViewVisible) {
+                    mainRightConstraint.constant = constant - sideViewWidth
+                }
                 view.setNeedsUpdateConstraints()
                 
                 if animated {
@@ -131,9 +137,11 @@ public class AdaptiveSidebarViewController : UIViewController {
         mainViewContainer.translatesAutoresizingMaskIntoConstraints = false
         mainViewContainer.backgroundColor = UIColor.blue
         view.addSubview(mainViewContainer)
-        let mHConstraints = NSLayoutConstraint.constraints(withVisualFormat: "H:|[mainView]|", options: [], metrics: nil, views: ["mainView" : mainViewContainer!])
+        let mainLeftConstraint = NSLayoutConstraint(item: mainViewContainer!, attribute: .leading, relatedBy: .equal, toItem: view, attribute: .leading, multiplier: 1.0, constant: 0.0)
+        mainRightConstraint = NSLayoutConstraint(item: mainViewContainer!, attribute: .trailing, relatedBy: .equal, toItem: view, attribute: .trailing, multiplier: 1.0, constant: 0.0)
         let mVConstraints = NSLayoutConstraint.constraints(withVisualFormat: "V:|[mainView]|", options: [], metrics: nil, views: ["mainView" : mainViewContainer!])
-        view.addConstraints(mHConstraints)
+        view.addConstraint(mainLeftConstraint)
+        view.addConstraint(mainRightConstraint)
         view.addConstraints(mVConstraints)
         
         sideViewContainer = UIView()
