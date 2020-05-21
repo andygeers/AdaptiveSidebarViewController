@@ -34,18 +34,23 @@ public class AdaptiveSidebarViewController : UIViewController {
             sideViewWidthConstraint.constant = sideViewWidth
         }
     }
+    public var bottomViewHeight : CGFloat = 320 {
+        didSet {
+            bottomViewBottomConstraint.constant = bottomViewHeight
+        }
+    }
     
     public func showSideView(animated: Bool) {
-        updateSideView(0, animated: animated)
+        updateSideView(visible: true, animated: animated)
     }
     
     public func hideSideView(animated: Bool) {
-        updateSideView(sideViewWidth, animated: animated)
+        updateSideView(visible: false, animated: animated)
     }
     
     public var sideViewVisible: Bool {
       get {
-        return sideViewRightConstraint.constant == 0
+        return sideViewRightConstraint.constant == 0 || bottomViewBottomConstraint.constant == 0
       }
     }
     
@@ -55,40 +60,52 @@ public class AdaptiveSidebarViewController : UIViewController {
     
     private var mainViewContainer: UIView!
     private var sideViewContainer: UIView!
+    private var bottomViewContainer: UIView!
+    private var currentSideViewContainer : UIView!
     
     private var sideViewWidthConstraint : NSLayoutConstraint!
     private var sideViewRightConstraint : NSLayoutConstraint!
     private var mainRightConstraint : NSLayoutConstraint!
     
+    private var bottomViewHeightConstraint : NSLayoutConstraint!
+    private var bottomViewBottomConstraint : NSLayoutConstraint!
+    private var mainBottomConstraint : NSLayoutConstraint!
+    
     private var toggleAnimationInProgress = false
     
-    private func updateSideView(_ constant: CGFloat, animated: Bool) {
-        if isSideViewControllerShownInSideViewContainer() {
-            if toggleAnimationInProgress == false {
-                sideViewRightConstraint.constant = constant
-                if (resizeMainViewWhenSideViewVisible) {
-                    mainRightConstraint.constant = constant - sideViewWidth
-                }
-                view.setNeedsUpdateConstraints()
+    private func updateSideView(visible: Bool, animated: Bool) {
+        guard toggleAnimationInProgress == false else { return }
                 
-                if animated {
-                    toggleAnimationInProgress = true
-                    
-                    UIView.animate(withDuration: 0.5, animations: { [weak self] in
-                        self?.view.layoutIfNeeded()
-                        }, completion: { [weak self] finished in
-                            self?.toggleAnimationInProgress = false
-                        })
-                }
+        if isRegularSize() {
+            let constant = visible ? 0 : sideViewWidth
+            sideViewRightConstraint.constant = constant
+            bottomViewBottomConstraint.constant = bottomViewHeight
+            
+            if (resizeMainViewWhenSideViewVisible) {
+                mainBottomConstraint.constant = 0
+                mainRightConstraint.constant = constant - sideViewWidth
             }
         } else {
-            if let sideViewController = sideViewController {
-                if constant == 0 {
-                    show(sideViewController, sender: self)
-                } else {
-                    hideViewController(sideViewController, animated: animated)
-                }
+            let constant = visible ? 0 : bottomViewHeight
+            bottomViewBottomConstraint.constant = constant
+            sideViewRightConstraint.constant = bottomViewHeight
+            
+            if (resizeMainViewWhenSideViewVisible) {
+                mainRightConstraint.constant = 0
+                mainBottomConstraint.constant = constant - bottomViewHeight
             }
+        }
+        
+        view.setNeedsUpdateConstraints()
+        
+        if animated {
+            toggleAnimationInProgress = true
+            
+            UIView.animate(withDuration: 0.5, animations: { [weak self] in
+                self?.view.layoutIfNeeded()
+                }, completion: { [weak self] finished in
+                    self?.toggleAnimationInProgress = false
+                })
         }
     }
     
@@ -101,8 +118,12 @@ public class AdaptiveSidebarViewController : UIViewController {
             addViewControllerToContainer(mainViewController, container: mainViewContainer)
         }
         
-        if let sideViewController = sideViewController, isRegularSize() {
-            addViewControllerToContainer(sideViewController, container: sideViewContainer)
+        if let sideViewController = sideViewController {
+            if isRegularSize() {
+                addViewControllerToContainer(sideViewController, container: sideViewContainer)
+            } else {
+                addViewControllerToContainer(sideViewController, container: bottomViewContainer)
+            }
         }
     }
     
@@ -120,6 +141,10 @@ public class AdaptiveSidebarViewController : UIViewController {
         
         viewController.endAppearanceTransition()
         viewController.didMove(toParent: self)
+        
+        if viewController == sideViewController {
+            self.currentSideViewContainer = container
+        }
     }
 
     private func removeViewControllerFromContainer(viewController: UIViewController, container: UIView) {
@@ -139,10 +164,12 @@ public class AdaptiveSidebarViewController : UIViewController {
         view.addSubview(mainViewContainer)
         let mainLeftConstraint = NSLayoutConstraint(item: mainViewContainer!, attribute: .leading, relatedBy: .equal, toItem: view, attribute: .leading, multiplier: 1.0, constant: 0.0)
         mainRightConstraint = NSLayoutConstraint(item: mainViewContainer!, attribute: .trailing, relatedBy: .equal, toItem: view, attribute: .trailing, multiplier: 1.0, constant: 0.0)
-        let mVConstraints = NSLayoutConstraint.constraints(withVisualFormat: "V:|[mainView]|", options: [], metrics: nil, views: ["mainView" : mainViewContainer!])
+        mainBottomConstraint = NSLayoutConstraint(item: mainViewContainer!, attribute: .bottom, relatedBy: .equal, toItem: view, attribute: .bottom, multiplier: 1.0, constant: 0.0)
+        let mainTopConstraint = NSLayoutConstraint(item: mainViewContainer!, attribute: .top, relatedBy: .equal, toItem: view, attribute: .top, multiplier: 1.0, constant: 0.0)
         view.addConstraint(mainLeftConstraint)
         view.addConstraint(mainRightConstraint)
-        view.addConstraints(mVConstraints)
+        view.addConstraint(mainBottomConstraint)
+        view.addConstraint(mainTopConstraint)
         
         sideViewContainer = UIView()
         sideViewContainer.translatesAutoresizingMaskIntoConstraints = false
@@ -155,18 +182,23 @@ public class AdaptiveSidebarViewController : UIViewController {
         view.addConstraint(sideViewWidthConstraint)
         view.addConstraint(sideViewRightConstraint)
         view.addConstraints(sVConstraints)
+        
+        bottomViewContainer = UIView()
+        bottomViewContainer.translatesAutoresizingMaskIntoConstraints = false
+        bottomViewContainer.backgroundColor = UIColor.red
+        view.addSubview(bottomViewContainer)
+        
+        bottomViewHeightConstraint = NSLayoutConstraint(item: bottomViewContainer!, attribute: .height, relatedBy: .equal, toItem: nil, attribute: .notAnAttribute, multiplier: 1.0, constant: bottomViewHeight)
+        bottomViewBottomConstraint = NSLayoutConstraint(item: bottomViewContainer!, attribute: .bottom, relatedBy: .equal, toItem: view, attribute: .bottom, multiplier: 1.0, constant: bottomViewHeight)
+        let sHConstraints = NSLayoutConstraint.constraints(withVisualFormat: "H:|[bottomView]|", options: [], metrics: nil, views: ["bottomView" : bottomViewContainer!])
+        view.addConstraint(bottomViewHeightConstraint)
+        view.addConstraint(bottomViewBottomConstraint)
+        view.addConstraints(sHConstraints)
     }
     
     
     private func isRegularSize(traitCollection : UITraitCollection = UIScreen.main.traitCollection) -> Bool {
         return traitCollection.horizontalSizeClass == .regular && traitCollection.verticalSizeClass == .regular
-    }
-    
-    private func isSideViewControllerShownInSideViewContainer() -> Bool {
-        if let superview = sideViewController?.view.superview, superview.isEqual(sideViewContainer) {
-            return true
-        }
-        return false
     }
     
     private func hideViewController(_ viewController: UIViewController, animated: Bool) {
@@ -184,10 +216,11 @@ public class AdaptiveSidebarViewController : UIViewController {
         if let sideViewController = sideViewController {
             hideSideView(animated: false)
             if isRegularSize(traitCollection: newCollection) {
-                removeViewControllerFromContainer(viewController: sideViewController, container: sideViewContainer)
+                removeViewControllerFromContainer(viewController: sideViewController, container: currentSideViewContainer)
                 addViewControllerToContainer(sideViewController, container: sideViewContainer)
             } else {
-                removeViewControllerFromContainer(viewController: sideViewController, container: sideViewContainer)
+                removeViewControllerFromContainer(viewController: sideViewController, container: currentSideViewContainer)
+                addViewControllerToContainer(sideViewController, container: bottomViewContainer)
             }
         }
     }
