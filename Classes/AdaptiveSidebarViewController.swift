@@ -26,6 +26,8 @@ import UIKit
 public class AdaptiveSidebarViewController : UIViewController {
     
     //MARK: Public
+    
+    final let HEIGHT_THRESHOLD : CGFloat = 675
 
     public var mainViewController : UIViewController?
     public var sideViewController : UIViewController?
@@ -36,7 +38,9 @@ public class AdaptiveSidebarViewController : UIViewController {
     }
     public var bottomViewHeight : CGFloat = 320 {
         didSet {
-            bottomViewBottomConstraint.constant = bottomViewHeight
+            if (bottomViewBottomConstraint != nil) {
+                bottomViewBottomConstraint.constant = bottomViewHeight
+            }
         }
     }
     
@@ -88,7 +92,7 @@ public class AdaptiveSidebarViewController : UIViewController {
         } else {
             let constant = visible ? 0 : bottomViewHeight
             bottomViewBottomConstraint.constant = constant
-            sideViewRightConstraint.constant = bottomViewHeight
+            sideViewRightConstraint.constant = sideViewWidth
             
             if (resizeMainViewWhenSideViewVisible) {
                 mainRightConstraint.constant = 0
@@ -111,6 +115,11 @@ public class AdaptiveSidebarViewController : UIViewController {
     
     override public func viewDidLoad() {
         super.viewDidLoad()
+        
+        let maxDimension = max(self.view.frame.size.width, self.view.frame.size.height)
+        if (maxDimension < HEIGHT_THRESHOLD) {
+            self.bottomViewHeight = 160
+        }
         
         setupContainerViews()
         
@@ -213,8 +222,10 @@ public class AdaptiveSidebarViewController : UIViewController {
     
     override public func willTransition(to newCollection: UITraitCollection, with coordinator: UIViewControllerTransitionCoordinator) {
         super.willTransition(to: newCollection, with: coordinator)
+        
         if let sideViewController = sideViewController {
             hideSideView(animated: false)
+            
             if isRegularSize(traitCollection: newCollection) {
                 removeViewControllerFromContainer(viewController: sideViewController, container: currentSideViewContainer)
                 addViewControllerToContainer(sideViewController, container: sideViewContainer)
